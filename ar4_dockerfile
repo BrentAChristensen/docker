@@ -1,0 +1,90 @@
+FROM ros:humble
+
+# Add vscode user with same UID and GID as your host system
+# (copied from https://code.visualstudio.com/remote/advancedcontainers/add-nonroot-user#_creating-a-nonroot-user)
+ARG USERNAME=vscode
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && apt-get update \
+    && apt-get install -y sudo \
+    && echo "$USERNAME ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+RUN usermod -aG dialout $USERNAME
+
+# Add user to video group to allow access to webcam
+RUN usermod --append --groups video $USERNAME
+
+RUN sudo apt-get update && apt-get install -y \
+    ros-${ROS_DISTRO}-ros2-controllers \
+    ros-${ROS_DISTRO}-ros2-control \
+    ros-${ROS_DISTRO}-joint-trajectory-controller \
+    ros-${ROS_DISTRO}-rqt-console \
+    ros-${ROS_DISTRO}-gazebo-ros2-control \
+    ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
+    ros-${ROS_DISTRO}-diagnostic-updater \
+    git \
+    python3-pip \
+    python3-venv \
+    socat \
+    ros-${ROS_DISTRO}-rqt* \
+    libserial-dev 
+
+# Clean up APT when done.
+RUN sudo apt install python3-vcstool
+RUN sudo apt install python3-colcon-common-extensions
+RUN sudo apt install python3-colcon-mixin
+RUN sudo apt-get install usbutils
+
+
+RUN git clone https://github.com/ycheng517/ar4_ros_driver.git
+
+WORKDIR /ar4_ros_driver
+
+RUN vcs import . --input ar_hand_eye/hand_eye_calibration.repos
+
+RUN rosdep update
+
+RUN rosdep install --from-paths . --ignore-src -r -y
+
+
+WORKDIR /ar4_ws/src
+
+RUN git clone --branch humble https://github.com/ros-planning/moveit2_tutorials
+
+RUN vcs import < moveit2_tutorials/moveit2_tutorials.repos
+
+RUN rosdep update
+
+RUN rosdep install --from-paths . --ignore-src -r -y
+
+USER $USERNAME 
+
+RUN sudo mkdir -p /etc/apt/keyrings
+RUN curl -sSf https://librealsense.intel.com/Debian/librealsense.pgp | sudo tee /etc/apt/keyrings/librealsense.pgp > /dev/null
+
+
+RUN echo "deb [signed-by=/etc/apt/keyrings/librealsense.pgp] https://librealsense.intel.com/Debian/apt-repo `lsb_release -cs` main" | \
+sudo tee /etc/apt/sources.list.d/librealsense.list
+RUN sudo apt-get update
+
+RUN sudo apt-get -y install linux-headers-$(uname -r)
+
+
+RUN sudo apt-get -y install librealsense2-dkms 
+RUN sudo apt-get -y install librealsense2-utils
+RUN sudo apt-get -y install librealsense2-dev
+RUN sudo apt-get -y install librealsense2-dbg
+
+
+#Install moveit2 from source
+WORKDIR /workspaces/ar4_ws
+
+RUN colcon build 
+# Source the ROS setup file
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/vscode/.bashrc
+RUN echo "source ~/workspaces/ar4_ws/install/setup.bash" >> /home/vscode/.bash
+
+WORKDIR /workspaces/ar4_ws

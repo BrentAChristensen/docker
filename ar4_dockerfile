@@ -18,6 +18,7 @@ RUN usermod -aG dialout $USERNAME
 RUN usermod --append --groups video $USERNAME
 
 RUN sudo apt-get update && apt-get install -y \
+    ros-humble-tf-transformations \
     ros-${ROS_DISTRO}-ros2-controllers \
     ros-${ROS_DISTRO}-ros2-control \
     ros-${ROS_DISTRO}-joint-trajectory-controller \
@@ -28,7 +29,7 @@ RUN sudo apt-get update && apt-get install -y \
     git \
     python3-pip \
     python3-venv \
-    socat \
+    nano \
     ros-${ROS_DISTRO}-rqt* \
     libserial-dev 
 
@@ -39,12 +40,16 @@ RUN sudo apt install python3-colcon-mixin
 RUN sudo apt-get install usbutils
 
 
+#RUN sudo apt install ros-${ROSDISTRO}-tf-transformations
+#RUN sudo pip3 install transforms3d
+
+WORKDIR /src
+
 RUN git clone https://github.com/ycheng517/ar4_ros_driver.git
-
 WORKDIR /ar4_ros_driver
+RUN git clone https://github.com/ycheng517/ar4_hand_eye_calibration
 
-RUN vcs import . --input ar_hand_eye/hand_eye_calibration.repos
-
+RUN vcs import . --input ar4_hand_eye_calibration/hand_eye_calibration.repos
 RUN rosdep update
 
 RUN rosdep install --from-paths . --ignore-src -r -y
@@ -65,7 +70,6 @@ USER $USERNAME
 RUN sudo mkdir -p /etc/apt/keyrings
 RUN curl -sSf https://librealsense.intel.com/Debian/librealsense.pgp | sudo tee /etc/apt/keyrings/librealsense.pgp > /dev/null
 
-
 RUN echo "deb [signed-by=/etc/apt/keyrings/librealsense.pgp] https://librealsense.intel.com/Debian/apt-repo `lsb_release -cs` main" | \
 sudo tee /etc/apt/sources.list.d/librealsense.list
 RUN sudo apt-get update
@@ -73,11 +77,10 @@ RUN sudo apt-get update
 RUN sudo apt-get -y install linux-headers-$(uname -r)
 
 
-RUN sudo apt-get -y install librealsense2-dkms 
 RUN sudo apt-get -y install librealsense2-utils
 RUN sudo apt-get -y install librealsense2-dev
 RUN sudo apt-get -y install librealsense2-dbg
-
+#RUN sudo apt-get -y install librealsense2-dkms 
 
 #Install moveit2 from source
 WORKDIR /workspaces/ar4_ws
@@ -85,6 +88,11 @@ WORKDIR /workspaces/ar4_ws
 RUN colcon build 
 # Source the ROS setup file
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/vscode/.bashrc
-RUN echo "source ~/workspaces/ar4_ws/install/setup.bash" >> /home/vscode/.bash
+RUN echo "source ~/workspaces/brent/dev/ros2/humble/ar4_ws/install/setup.bash" >> /home/vscode/.bash
 
-WORKDIR /workspaces/ar4_ws
+RUN git config --global user.email "brent.a.christensen@gmail.com"
+RUN git config --global user.name "Brent Christensen"
+#Terminal #1 Testing Image
+# ros2 launch ar_gazebo ar_gazebo.launch.py include_gripper:=True gripper_name:=wheeltec use_sim_time:=True
+# ros2 launch ar4_hand_eye_calibration calibrate.launch.py use_sim_time:=True include_gripper:=True gripper_name:=wheeltec
+WORKDIR /workspaces/brent/dev/ros2/humble/ar4_ws

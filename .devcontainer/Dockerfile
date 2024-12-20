@@ -46,6 +46,8 @@ RUN apt-get update \
 USER $USERNAME
 WORKDIR /ar4_ws
 
+RUN git clone https://github.com/BrentAChristensen/docker.git
+
 # Clone repositories
 RUN mkdir -p src \
     && cd src \
@@ -90,12 +92,15 @@ WORKDIR /workspaces/${USERNAME}/ar4_ws
 # Setup environment for ROS and Python virtual environment
 RUN echo 'source /opt/ros/jazzy/setup.bash' >> ~/.bashrc \
     && echo 'source install/setup.bash' >> ~/.bashrc \
-    && echo 'export PYTHONPATH="/opt/venv/lib/python3.12/site-packages:$PYTHONPATH"' >> ~/.bashrc
+    && echo 'export PYTHONPATH="/opt/venv/lib/python3.12/site-packages:$PYTHONPATH"' >> ~/.bashrc \
+    && echo 'source /opt/venv/bin/activate' >> ~/.bashrc
 
-# Optionally build ROS workspace here:
+    # Optionally build ROS workspace here:
 RUN colcon build
 
-RUN echo 'source /opt/venv/bin/activate' >> ~/.bashrc
 ENV PATH="/opt/venv/bin:${PATH}"
+
+# Create the symbolic link
+RUN ln -s /home/brent/ar4_ws/docker/.devcontainer .devcontainer
 
 CMD ["bash"]

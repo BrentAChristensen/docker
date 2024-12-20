@@ -1,98 +1,101 @@
-FROM ros:humble
+FROM ros:jazzy
 
-# Add vscode user with same UID and GID as your host system
-# (copied from https://code.visualstudio.com/remote/advancedcontainers/add-nonroot-user#_creating-a-nonroot-user)
-ARG USERNAME=vscode
+# Remove 'ubuntu' user if it exists
+RUN userdel -r ubuntu || true
+
+ARG USERNAME=docker
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
+
+USER root
+
+# Create non-root user and install basic dependencies
 RUN groupadd --gid $USER_GID $USERNAME \
     && useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME \
     && apt-get update \
-    && apt-get install -y sudo \
+    && apt-get install -y sudo python3-pip python3-venv wget gnupg2 ca-certificates curl nano \
     && echo "$USERNAME ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME
+    && chmod 0440 /etc/sudoers.d/$USERNAME \
+    && usermod -aG dialout,video $USERNAME \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN usermod -aG dialout $USERNAME
+# Install CUDA toolkit
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \
+    && dpkg -i cuda-keyring_1.1-1_all.deb \
+    && rm cuda-keyring_1.1-1_all.deb \
+    && apt-get update \
+    && apt-get install -y cuda-toolkit-12-6 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Add user to video group to allow access to webcam
-RUN usermod --append --groups video $USERNAME
+ENV PATH="/usr/local/cuda-12.6/bin:${PATH}"
 
-RUN sudo apt-get update && apt-get install -y \
-    ros-humble-tf-transformations \
-    ros-${ROS_DISTRO}-ros2-controllers \
-    ros-${ROS_DISTRO}-ros2-control \
-    ros-${ROS_DISTRO}-joint-trajectory-controller \
-    ros-${ROS_DISTRO}-rqt-console \
-    ros-${ROS_DISTRO}-gazebo-ros2-control \
-    ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
-    ros-${ROS_DISTRO}-diagnostic-updater \
-    git \
-    python3-pip \
-    python3-venv \
-    nano \
-    ros-${ROS_DISTRO}-rqt* \
-    libserial-dev 
+# Add NVIDIA machine learning repo key
+RUN mkdir -p /usr/share/keyrings \
+    && wget -qO - http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu2004/x86_64/7fa2af80.pub \
+    | gpg --dearmor > /usr/share/keyrings/nvidia-ml.gpg
 
-# Clean up APT when done.
-RUN sudo apt install python3-vcstool
-RUN sudo apt install python3-colcon-common-extensions
-RUN sudo apt install python3-colcon-mixin
-RUN sudo apt-get install usbutils
+# Add NVIDIA ml repo
+RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/nvidia-ml.gpg] http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu2004/x86_64 /" \
+    > /etc/apt/sources.list.d/nvidia-ml.list
 
+# Install TensorRT
+RUN apt-get update \
+    && apt-get install -y tensorrt \
+    && rm -rf /var/lib/apt/lists/*
 
-#RUN sudo apt install ros-${ROSDISTRO}-tf-transformations
-#RUN sudo pip3 install transforms3d
+USER $USERNAME
+WORKDIR /ar4_ws
 
-WORKDIR /src
+# Clone repositories
+RUN mkdir -p src \
+    && cd src \
+    && git clone https://github.com/ycheng517/ar4_ros_driver.git \
+    && git clone https://github.com/ycheng517/ar4_hand_eye_calibration.git \
+    && git clone https://github.com/BrentAChristensen/impact.git \
+    && git clone https://github.com/BrentAChristensen/hyperactive.git \
+    && git clone https://github.com/BrentAChristensen/yolo_inference.git
 
-RUN git clone https://github.com/ycheng517/ar4_ros_driver.git
-WORKDIR /ar4_ros_driver
-RUN git clone https://github.com/ycheng517/ar4_hand_eye_calibration
+USER root
+# Install ROS dependencies
+RUN apt-get update \
+    && rosdep update \
+    && rosdep install --from-paths src --ignore-src -r -y \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN vcs import . --input ar4_hand_eye_calibration/hand_eye_calibration.repos
-RUN rosdep update
+USER $USERNAME
+RUN vcs import src < src/ar4_hand_eye_calibration/hand_eye_calibration.repos
 
-RUN rosdep install --from-paths . --ignore-src -r -y
+USER root
+# Additional ROS packages
+RUN apt-get update \
+    && apt-get install -y \
+       ros-${ROS_DISTRO}-gz-ros2-control \
+       ros-${ROS_DISTRO}-librealsense2* \
+       ros-${ROS_DISTRO}-realsense2-* \
+       ros-${ROS_DISTRO}-tf-transformations \
+       ros-${ROS_DISTRO}-rqt \
+       ros-${ROS_DISTRO}-rqt-joint-trajectory-controller \
+       ros-${ROS_DISTRO}-moveit-configs-utils \
+    && rm -rf /var/lib/apt/lists/*
 
+# Python venv and PyTorch/YOLO
+RUN python3 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --upgrade pip \
+    && /opt/venv/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu \
+    && /opt/venv/bin/pip install ultralytics catkin_pkg empy==3.3.4 lark-parser
 
-WORKDIR /ar4_ws/src
+USER $USERNAME
+WORKDIR /workspaces/${USERNAME}/ar4_ws
 
-RUN git clone --branch humble https://github.com/ros-planning/moveit2_tutorials
+# Setup environment for ROS and Python virtual environment
+RUN echo 'source /opt/ros/jazzy/setup.bash' >> ~/.bashrc \
+    && echo 'source install/setup.bash' >> ~/.bashrc \
+    && echo 'export PYTHONPATH="/opt/venv/lib/python3.12/site-packages:$PYTHONPATH"' >> ~/.bashrc
 
-RUN vcs import < moveit2_tutorials/moveit2_tutorials.repos
+# Optionally build ROS workspace here:
+RUN colcon build
 
-RUN rosdep update
+RUN echo 'source /opt/venv/bin/activate' >> ~/.bashrc
+ENV PATH="/opt/venv/bin:${PATH}"
 
-RUN rosdep install --from-paths . --ignore-src -r -y
-
-USER $USERNAME 
-
-RUN sudo mkdir -p /etc/apt/keyrings
-RUN curl -sSf https://librealsense.intel.com/Debian/librealsense.pgp | sudo tee /etc/apt/keyrings/librealsense.pgp > /dev/null
-
-RUN echo "deb [signed-by=/etc/apt/keyrings/librealsense.pgp] https://librealsense.intel.com/Debian/apt-repo `lsb_release -cs` main" | \
-sudo tee /etc/apt/sources.list.d/librealsense.list
-RUN sudo apt-get update
-
-RUN sudo apt-get -y install linux-headers-$(uname -r)
-
-
-RUN sudo apt-get -y install librealsense2-utils
-RUN sudo apt-get -y install librealsense2-dev
-RUN sudo apt-get -y install librealsense2-dbg
-#RUN sudo apt-get -y install librealsense2-dkms 
-
-#Install moveit2 from source
-WORKDIR /workspaces/ar4_ws
-
-RUN colcon build 
-# Source the ROS setup file
-RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/vscode/.bashrc
-RUN echo "source ~/workspaces/brent/dev/ros2/humble/ar4_ws/install/setup.bash" >> /home/vscode/.bash
-
-RUN git config --global user.email "brent.a.christensen@gmail.com"
-RUN git config --global user.name "Brent Christensen"
-#Terminal #1 Testing Image
-# ros2 launch ar_gazebo ar_gazebo.launch.py include_gripper:=True gripper_name:=wheeltec use_sim_time:=True
-# ros2 launch ar4_hand_eye_calibration calibrate.launch.py use_sim_time:=True include_gripper:=True gripper_name:=wheeltec
-WORKDIR /workspaces/brent/dev/ros2/humble/ar4_ws
+CMD ["bash"]

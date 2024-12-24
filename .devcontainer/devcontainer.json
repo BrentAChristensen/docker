@@ -24,7 +24,8 @@
           "ms-azuretools.vscode-docker",
           "platformio.platformio-ide",
           "Wokwi.wokwi-vscode",
-          "ms-python.python"
+          "ms-python.python",
+          "yzhang.markdown-all-in-one"
         ]
       }
     }

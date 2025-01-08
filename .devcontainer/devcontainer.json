@@ -1,32 +1,32 @@
 {
-    "name": "ar4_jazzy",
-    "build":{
-      "dockerfile": "Dockerfile"
-    },
-    "containerEnv": {
-      "DISPLAY": "unix:0"
-    },
-    "mounts": [
-      "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached"
-    ],
-    "runArgs": [
-      "--privileged",
-      "--rm"
-    ],
-    "forwardPorts": [],
-    "postCreateCommand": "echo 'Development Container Initialized'",
-    "remoteUser": "docker",
-    "customizations": {
-      "vscode": {
-        "extensions": [
-          "ms-vscode.vscode-serial-monitor",
-          "genieai.chatgpt-vscode",
-          "ms-azuretools.vscode-docker",
-          "platformio.platformio-ide",
-          "Wokwi.wokwi-vscode",
-          "ms-python.python",
-          "yzhang.markdown-all-in-one"
-        ]
-      }
+  "name": "hyperactive/ros2/ultralytics:ar4",
+  "build":{
+    "dockerfile": "Dockerfile"
+  },
+  "containerEnv": {
+    "DISPLAY": "unix:0"
+  },
+  "mounts": [
+    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached"
+  ],
+  "runArgs": [
+    "--privileged",
+    "--rm"
+  ],
+  "forwardPorts": [],
+  "postCreateCommand": "echo 'Development Container Initialized'",
+  "remoteUser": "docker",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-serial-monitor",
+        "genieai.chatgpt-vscode",
+        "ms-azuretools.vscode-docker",
+        "platformio.platformio-ide",
+        "Wokwi.wokwi-vscode",
+        "ms-python.python",
+        "yzhang.markdown-all-in-one"
+      ]
     }
   }
+}

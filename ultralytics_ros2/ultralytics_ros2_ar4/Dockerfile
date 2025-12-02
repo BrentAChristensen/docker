@@ -122,18 +122,25 @@ RUN sudo mkdir src && cd src \
     && sudo git clone https://github.com/ycheng517/ar4_ros_driver.git \
     && sudo git clone https://github.com/ycheng517/ar4_hand_eye_calibration.git \
     && sudo git clone https://github.com/BrentAChristensen/hyperactive.git \
-    && sudo vcs import . --input ar4_hand_eye_calibration/hand_eye_calibration.repos 
+    && sudo vcs import . --input ar4_hand_eye_calibration/hand_eye_calibration.repos \
+    && sudo git clone https://github.com/BrentAChristensen/Peacock_data.git 
    
 RUN sudo git clone https://github.com/mgonzs13/yolo_ros.git
 
 RUN /opt/venv/bin/pip install -r yolo_ros/requirements.txt
 
 RUN sudo rm -rf /var/lib/apt/lists/*
-RUN sudo git clone https://github.com/BrentAChristensen/Peacock_data.git 
+
 RUN sudo apt-get update
 
+#move the easy_handeye2 folder into the /home/.ros
+WORKDIR ~/
+RUN sudo mkdir ~/.ros2
 
-#RUN sudo rosdep install --from-paths src --ignore-src -r -y
+RUN sudo mv /ros_ws/src/Peacock_data/easy_handeye2  ~/.ros2/easy_handeye2
+
+WORKDIR /ros_ws
+
 
 RUN /bin/bash -c "source /opt/ros/$ROS_DISTRO/setup.bash && colcon build"
 
@@ -144,4 +151,6 @@ RUN echo "source /opt/ros/$ROS_DISTRO/setup.bash && source /ros_ws/install/setup
 
 # Run a default command, e.g., starting a bash shell
 CMD ["bash"]
+
+#Add default configuration to arcu markers
 

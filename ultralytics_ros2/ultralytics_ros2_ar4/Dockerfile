@@ -1,10 +1,21 @@
-# Base Image
 FROM osrf/ros:jazzy-desktop-full
 
+ARG USERNAME=docker
+ARG USER_UID=1001
+ARG USER_GID=$USER_UID
 # Environment Variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=jazzy
 ENV PYTHONPATH="/opt/venv/lib/python3.10/site-packages"
+
+# Install necessary packages and set up user in a single step
+RUN apt-get update && \
+    apt-get install -y sudo passwd && \
+    groupadd --gid $USER_GID $USERNAME && \
+    useradd -m -s /bin/bash -u $USER_UID -g $USER_GID -G dialout,video,sudo $USERNAME && \
+    echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    echo "$USERNAME:$USERNAME" | chpasswd && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install necessary packages and set up the environment in one layer
 RUN apt-get update && apt-get install -y \
@@ -55,8 +66,11 @@ RUN python3 -m venv /opt/venv && chmod -R 777 /opt/venv && \
 # Initializing ROS dependencies
 RUN rosdep update
 
+WORKDIR /ros_ws
+
+USER $USERNAME
 # Set working directory and clone repositories
-WORKDIR /ros_ws/src
+
 RUN git clone https://github.com/ycheng517/ar4_ros_driver.git && \
     git clone https://github.com/ycheng517/ar4_hand_eye_calibration.git && \
     git clone https://github.com/BrentAChristensen/hyperactive.git && \

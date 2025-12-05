@@ -68,7 +68,6 @@ RUN rosdep update
 
 WORKDIR /ros_ws
 
-USER $USERNAME
 # Set working directory and clone repositories
 
 RUN git clone https://github.com/ycheng517/ar4_ros_driver.git && \
@@ -81,15 +80,15 @@ RUN git clone https://github.com/ycheng517/ar4_ros_driver.git && \
 # Install Python requirements for yolo_ros
 RUN /opt/venv/bin/pip install -r yolo_ros/requirements.txt
 
-# Move directories
-RUN mkdir ~/.ros2 && mv /ros_ws/src/Peacock_data/easy_handeye2 ~/.ros2/easy_handeye2
 
-# Build workspace
+# Move directories
+RUN mkdir home/$USER_NAME/.ros2 && mv /ros_ws/src/Peacock_data/easy_handeye2 home/$USER_NAME/.ros2/easy_handeye2
 WORKDIR /ros_ws
 RUN /bin/bash -c "source /opt/ros/$ROS_DISTRO/setup.bash && colcon build"
 
 # Source configurations
 RUN echo "source /opt/ros/$ROS_DISTRO/setup.bash && source /ros_ws/install/setup.bash && source /opt/venv/bin/activate" >> ~/.bashrc
-
+# Build workspace
+USER $USERNAME
 # Default command
 CMD ["bash"]

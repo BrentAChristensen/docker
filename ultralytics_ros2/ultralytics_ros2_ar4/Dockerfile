@@ -18,6 +18,7 @@ RUN apt-get update && \
     echo "$USERNAME:$USERNAME" | chpasswd && \
     rm -rf /var/lib/apt/lists/*
 
+
 # Install necessary packages and set up the environment in one layer
 RUN apt-get update && apt-get install -y \
     lsb-release \
@@ -69,6 +70,7 @@ RUN rosdep update
 
 RUN mkdir /ros_ws
 WORKDIR /ros_ws/src
+RUN sudo chmod -R 777 /ros_ws
 
 # Set working directory and clone repositories
 
@@ -83,7 +85,7 @@ RUN git clone https://github.com/ycheng517/ar4_ros_driver.git && \
 RUN /opt/venv/bin/pip install -r yolo_ros/requirements.txt
 
 # Move directories
-RUN mkdir ~/.ros2 
+RUN sudo mkdir ~/.ros2 
 RUN sudo mv /ros_ws/src/Peacock_data/easy_handeye2 ~/.ros2/easy_handeye2
 
 
